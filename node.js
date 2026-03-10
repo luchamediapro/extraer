@@ -1,11 +1,12 @@
 {
-  "name": "m3u8-extractor-render",
+  "name": "hls-proxy",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
+    "axios": "^1.6.0",
     "express": "^4.18.2"
   }
 }
