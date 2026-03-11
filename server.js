@@ -8,13 +8,13 @@ const PORT = process.env.PORT || 3000
 
 let streamCache = {}
 
-async function getStream(id){
+async function getStream(stream){
 
-    if(streamCache[id]) return streamCache[id]
+    if(streamCache[stream]) return streamCache[stream]
 
     try{
 
-        const embed = `https://deportes.ksdjugfsddeports.com/tvporinternet3.php?stream=${id}_`
+        const embed = `https://deportes.ksdjugfsddeports.com/tvporinternet3.php?stream=${stream}_`
 
         const res = await axios.get(embed,{timeout:10000})
 
@@ -30,14 +30,13 @@ async function getStream(id){
             url = Buffer.from(url,'base64').toString('utf8')
         }
 
-        streamCache[id] = url
+        streamCache[stream] = url
 
         return url
 
     }catch(e){
         return null
     }
-
 }
 
 app.get("/",(req,res)=>{
@@ -46,9 +45,9 @@ res.send("Servidor IPTV funcionando")
 
 app.get("/play", async (req,res)=>{
 
-    const id = req.query.id || 5
+    const stream = req.query.stream || 75
 
-    const m3u8 = await getStream(id)
+    const m3u8 = await getStream(stream)
 
     if(!m3u8){
         res.send("stream no disponible")
@@ -104,27 +103,21 @@ app.get("/segment",(req,res)=>{
 
     const client = url.startsWith("https") ? https : http
 
-    try{
+    client.get(url,{
+        headers:{
+            "Referer":"https://deportes.ksdjugfsddeports.com/",
+            "Origin":"https://deportes.ksdjugfsddeports.com",
+            "User-Agent":"Mozilla/5.0"
+        }
+    },stream=>{
 
-        client.get(url,{
-            headers:{
-                "Referer":"https://deportes.ksdjugfsddeports.com/",
-                "Origin":"https://deportes.ksdjugfsddeports.com",
-                "User-Agent":"Mozilla/5.0"
-            }
-        },stream=>{
+        res.setHeader("Content-Type","video/mp2t")
 
-            res.setHeader("Content-Type","video/mp2t")
+        stream.pipe(res)
 
-            stream.pipe(res)
-
-        }).on("error",()=>{
-            res.end()
-        })
-
-    }catch(e){
+    }).on("error",()=>{
         res.end()
-    }
+    })
 
 })
 
