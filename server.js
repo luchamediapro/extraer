@@ -6,8 +6,8 @@ const https = require("https")
 const app = express()
 const PORT = process.env.PORT || 3000
 
-let playlistCache = {}
 let streamCache = {}
+let playlistCache = {}
 
 async function getStream(id){
 
@@ -16,6 +16,7 @@ async function getStream(id){
     const embed = `https://deportes.ksdjugfsddeports.com/tvporinternet3.php?stream=${id}_`
 
     const res = await axios.get(embed)
+
     const html = res.data
 
     const match = html.match(/atob\(atob\(atob\(atob\("([^"]+)/)
@@ -25,7 +26,7 @@ async function getStream(id){
     let url = match[1]
 
     for(let i=0;i<4;i++){
-        url = Buffer.from(url,'base64').toString('utf8')
+        url = Buffer.from(url,"base64").toString("utf8")
     }
 
     streamCache[id] = url
@@ -99,11 +100,6 @@ app.get("/segment",(req,res)=>{
 
     const url = req.query.url
 
-    if(!url){
-        res.send("no url")
-        return
-    }
-
     const client = url.startsWith("https") ? https : http
 
     client.get(url,{
@@ -122,6 +118,97 @@ app.get("/segment",(req,res)=>{
 
 })
 
+app.get("/playlist",(req,res)=>{
+
+    res.setHeader("Content-Type","audio/x-mpegurl")
+
+    let list = "#EXTM3U\n"
+
+    for(let i=1;i<=20;i++){
+
+        list += `#EXTINF:-1,Canal ${i}\n`
+        list += `${req.protocol}://${req.get("host")}/play?id=${i}\n`
+
+    }
+
+    res.send(list)
+
+})
+
+app.get("/",(req,res)=>{
+
+res.send(`
+
+<html>
+
+<head>
+
+<script src="https://cdn.jsdelivr.net/npm/clappr"></script>
+
+<style>
+
+body{
+background:black;
+color:white;
+font-family:Arial;
+text-align:center;
+}
+
+.player{
+width:90%;
+max-width:900px;
+margin:auto;
+}
+
+.channels button{
+margin:5px;
+padding:10px;
+font-size:16px;
+cursor:pointer;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h2>Panel IPTV</h2>
+
+<div class="player" id="player"></div>
+
+<div class="channels">
+
+<button onclick="play(1)">Canal 1</button>
+<button onclick="play(2)">Canal 2</button>
+<button onclick="play(3)">Canal 3</button>
+<button onclick="play(4)">Canal 4</button>
+<button onclick="play(5)">Canal 5</button>
+
+</div>
+
+<script>
+
+var player = new Clappr.Player({
+source:"/play?id=1",
+parentId:"#player",
+autoPlay:true
+})
+
+function play(id){
+player.load("/play?id="+id)
+}
+
+</script>
+
+</body>
+
+</html>
+
+`)
+
+})
+
 app.listen(PORT,()=>{
-    console.log("server running")
+console.log("server running")
 })
