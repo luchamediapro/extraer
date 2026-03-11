@@ -6,11 +6,29 @@ const https = require("https")
 const app = express()
 const PORT = process.env.PORT || 3000
 
-let streamCache = {}
+async function getStreamFromCanal(canal,target){
 
-async function getStream(stream){
+    try{
 
-    if(streamCache[stream]) return streamCache[stream]
+        const embed = `https://regionales.saohgdasregions.fun/stream.php?canal=${canal}&target=${target}`
+
+        const res = await axios.get(embed,{timeout:10000})
+
+        const html = res.data
+
+        const match = html.match(/(https?:\/\/[^"' ]+\.m3u8[^"' ]*)/)
+
+        if(!match) return null
+
+        return match[1]
+
+    }catch(e){
+        return null
+    }
+
+}
+
+async function getStreamFromId(stream){
 
     try{
 
@@ -30,13 +48,12 @@ async function getStream(stream){
             url = Buffer.from(url,'base64').toString('utf8')
         }
 
-        streamCache[stream] = url
-
         return url
 
     }catch(e){
         return null
     }
+
 }
 
 app.get("/",(req,res)=>{
@@ -45,23 +62,34 @@ res.send("Servidor IPTV funcionando")
 
 app.get("/play", async (req,res)=>{
 
-    const stream = req.query.stream || 75
+    let m3u8 = null
 
-    const m3u8 = await getStream(stream)
+    if(req.query.canal){
+
+        const canal = req.query.canal
+        const target = req.query.target || 3
+
+        m3u8 = await getStreamFromCanal(canal,target)
+
+    }else if(req.query.stream){
+
+        const stream = req.query.stream
+
+        m3u8 = await getStreamFromId(stream)
+
+    }
 
     if(!m3u8){
-        res.send("stream no disponible")
+        res.send("stream no encontrado")
         return
     }
 
     try{
 
         const playlist = await axios.get(m3u8,{
-            timeout:10000,
             headers:{
-                "Referer":"https://regionales.saohgdasregions.fun/",
-                "Origin":"https://regionales.saohgdasregions.fun/",
-                "User-Agent":"Mozilla/5.0"
+                "User-Agent":"Mozilla/5.0",
+                "Referer":"https://regionales.saohgdasregions.fun/"
             }
         })
 
@@ -105,9 +133,8 @@ app.get("/segment",(req,res)=>{
 
     client.get(url,{
         headers:{
-            "Referer":"https://regionales.saohgdasregions.fun/",
-            "Origin":"https://regionales.saohgdasregions.fun",
-            "User-Agent":"Mozilla/5.0"
+            "User-Agent":"Mozilla/5.0",
+            "Referer":"https://regionales.saohgdasregions.fun/"
         }
     },stream=>{
 
