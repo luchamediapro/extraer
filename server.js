@@ -6,12 +6,16 @@ const https = require("https")
 const app = express()
 const PORT = process.env.PORT || 3000
 
+let playlistCache = {}
+let streamCache = {}
+
 async function getStream(id){
+
+    if(streamCache[id]) return streamCache[id]
 
     const embed = `https://deportes.ksdjugfsddeports.com/tvporinternet3.php?stream=${id}_`
 
     const res = await axios.get(embed)
-
     const html = res.data
 
     const match = html.match(/atob\(atob\(atob\(atob\("([^"]+)/)
@@ -24,7 +28,35 @@ async function getStream(id){
         url = Buffer.from(url,'base64').toString('utf8')
     }
 
+    streamCache[id] = url
+
     return url
+}
+
+async function getPlaylist(id){
+
+    const now = Date.now()
+
+    if(playlistCache[id] && now - playlistCache[id].time < 5000){
+        return playlistCache[id].data
+    }
+
+    const stream = await getStream(id)
+
+    const res = await axios.get(stream,{
+        headers:{
+            "Referer":"https://deportes.ksdjugfsddeports.com/",
+            "Origin":"https://deportes.ksdjugfsddeports.com",
+            "User-Agent":"Mozilla/5.0"
+        }
+    })
+
+    playlistCache[id] = {
+        data:res.data,
+        time:now
+    }
+
+    return res.data
 }
 
 app.get("/play", async (req,res)=>{
@@ -38,19 +70,13 @@ app.get("/play", async (req,res)=>{
         return
     }
 
-    const playlist = await axios.get(m3u8,{
-        headers:{
-            "Referer":"https://deportes.ksdjugfsddeports.com/",
-            "Origin":"https://deportes.ksdjugfsddeports.com",
-            "User-Agent":"Mozilla/5.0"
-        }
-    })
+    const playlist = await getPlaylist(id)
 
     const base = m3u8.split("/").slice(0,-1).join("/")
 
     res.setHeader("Content-Type","application/vnd.apple.mpegurl")
 
-    playlist.data.split("\n").forEach(line=>{
+    playlist.split("\n").forEach(line=>{
 
         if(line.startsWith("#") || line.trim()==""){
             res.write(line+"\n")
