@@ -6,26 +6,37 @@ const https = require("https")
 const app = express()
 const PORT = process.env.PORT || 3000
 
-async function getStream(canal,target){
+let streamCache = {}
+
+async function getStream(stream){
+
+    if(streamCache[stream]) return streamCache[stream]
 
     try{
 
-        const embed = `https://regionales.saohgdasregions.fun/stream.php?canal=${canal}&target=${target}`
+        const embed = `https://deportes.ksdjugfsddeports.com/tvporinternet3.php?stream=${stream}_`
 
         const res = await axios.get(embed,{timeout:10000})
 
         const html = res.data
 
-        const match = html.match(/(https?:\/\/[^"' ]+\.m3u8[^"' ]*)/)
+        const match = html.match(/atob\(atob\(atob\(atob\("([^"]+)/)
 
         if(!match) return null
 
-        return match[1]
+        let url = match[1]
+
+        for(let i=0;i<4;i++){
+            url = Buffer.from(url,'base64').toString('utf8')
+        }
+
+        streamCache[stream] = url
+
+        return url
 
     }catch(e){
         return null
     }
-
 }
 
 app.get("/",(req,res)=>{
@@ -34,22 +45,23 @@ res.send("Servidor IPTV funcionando")
 
 app.get("/play", async (req,res)=>{
 
-    const canal = req.query.canal || "distritocomedia"
-    const target = req.query.target || 3
+    const stream = req.query.stream || 75
 
-    const m3u8 = await getStream(canal,target)
+    const m3u8 = await getStream(stream)
 
     if(!m3u8){
-        res.send("stream no encontrado")
+        res.send("stream no disponible")
         return
     }
 
     try{
 
         const playlist = await axios.get(m3u8,{
+            timeout:10000,
             headers:{
-                "User-Agent":"Mozilla/5.0",
-                "Referer":"https://regionales.saohgdasregions.fun/"
+                "Referer":"https://deportes.ksdjugfsddeports.com/",
+                "Origin":"https://deportes.ksdjugfsddeports.com",
+                "User-Agent":"Mozilla/5.0"
             }
         })
 
@@ -84,12 +96,18 @@ app.get("/segment",(req,res)=>{
 
     const url = req.query.url
 
+    if(!url){
+        res.send("segmento no valido")
+        return
+    }
+
     const client = url.startsWith("https") ? https : http
 
     client.get(url,{
         headers:{
-            "User-Agent":"Mozilla/5.0",
-            "Referer":"https://regionales.saohgdasregions.fun/"
+            "Referer":"https://deportes.ksdjugfsddeports.com/",
+            "Origin":"https://deportes.ksdjugfsddeports.com",
+            "User-Agent":"Mozilla/5.0"
         }
     },stream=>{
 
